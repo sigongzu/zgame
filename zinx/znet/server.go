@@ -3,6 +3,7 @@ package znet
 import (
 	"fmt"
 	"net"
+	"zgame/zinx/utils"
 	"zgame/zinx/ziface"
 )
 
@@ -29,10 +30,10 @@ func (s *Server) AddRouter(router ziface.IRouter) {
 // NewServer 初始化Server模块的方法
 func NewServer(name string) ziface.IServer {
 	s := &Server{
-		Name:      name,
+		Name:      utils.GlobalObject.Name,
 		IPVersion: "tcp4",
-		IP:        "0.0.0.0",
-		Port:      8999,
+		IP:        utils.GlobalObject.Host,
+		Port:      utils.GlobalObject.TcpPort,
 		Router:    nil,
 	}
 	return s
@@ -40,37 +41,43 @@ func NewServer(name string) ziface.IServer {
 
 // Start 启动服务器
 func (s *Server) Start() {
-	// 1 获取一个TCP的Addr
-	addr, err := net.ResolveTCPAddr(s.IPVersion, fmt.Sprintf("%s:%d", s.IP, s.Port))
-	if err != nil {
-		fmt.Println("resolve tcp addr error:", err)
-		return
-	}
-	// 2 监听服务器的地址
-	listener, err := net.ListenTCP(s.IPVersion, addr)
-	if err != nil {
-		fmt.Println("listen", s.IPVersion, "err", err)
-		return
-	}
-	fmt.Println("start Zinx server succ, ", s.Name, " succ, now listening...")
+	fmt.Printf("Server Name: %s, listenner at IP: %s, Port: %d is starting\n",
+		utils.GlobalObject.Name, utils.GlobalObject.Host, utils.GlobalObject.TcpPort)
+	fmt.Printf("Version: %s, MaxConn: %d, MaxPackageSize: %d\n",
+		utils.GlobalObject.Version, utils.GlobalObject.MaxConn, utils.GlobalObject.MaxPackageSize)
 
-	var cid uint32 = 0
-	// 3 阻塞的等待客户端链接，处理客户端链接业务（读写）
-	for {
-		// 如果有客户端链接过来，阻塞会返回
-		conn, err := listener.AcceptTCP()
+	go func() {
+		// 1 获取一个TCP的Addr
+		addr, err := net.ResolveTCPAddr(s.IPVersion, fmt.Sprintf("%s:%d", s.IP, s.Port))
 		if err != nil {
-			fmt.Println("Accept err", err)
-			continue
+			fmt.Println("resolve tcp addr error:", err)
+			return
 		}
-		// 已经与客户端建立链接
-		dealConn := NewConnection(conn, cid, s.Router)
-		cid++
+		// 2 监听服务器的地址
+		listener, err := net.ListenTCP(s.IPVersion, addr)
+		if err != nil {
+			fmt.Println("listen", s.IPVersion, "err", err)
+			return
+		}
+		fmt.Println("start Zinx server succ, ", s.Name, " succ, now listening...")
 
-		// 启动当前链接的处理业务
-		go dealConn.Start()
-	}
+		var cid uint32 = 0
+		// 3 阻塞的等待客户端链接，处理客户端链接业务（读写）
+		for {
+			// 如果有客户端链接过来，阻塞会返回
+			conn, err := listener.AcceptTCP()
+			if err != nil {
+				fmt.Println("Accept err", err)
+				continue
+			}
+			// 已经与客户端建立链接
+			dealConn := NewConnection(conn, cid, s.Router)
+			cid++
 
+			// 启动当前链接的处理业务
+			go dealConn.Start()
+		}
+	}()
 }
 
 // Stop 停止服务器
