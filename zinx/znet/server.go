@@ -16,6 +16,14 @@ type Server struct {
 	IP string
 	// 服务器监听的端口
 	Port int
+	// 当前Server添加一个router，server注册的链接对应的处理业务
+	Router ziface.IRouter
+}
+
+// AddRouter 给当前的Server注册一个路由方法，供客户端的链接处理使用
+func (s *Server) AddRouter(router ziface.IRouter) {
+	s.Router = router
+	fmt.Println("Add Router Succ!")
 }
 
 // NewServer 初始化Server模块的方法
@@ -25,19 +33,9 @@ func NewServer(name string) ziface.IServer {
 		IPVersion: "tcp4",
 		IP:        "0.0.0.0",
 		Port:      8999,
+		Router:    nil,
 	}
 	return s
-}
-
-// 定义当前客户端的连接的所绑定的handle api，也就是当前连接所要处理的业务，（目前写死）
-func CallBackToClient(conn *net.TCPConn, data []byte, cnt int) error {
-	// 回显业务
-	fmt.Println("[Conn Handle] CallbackToClient...")
-	if _, err := conn.Write(data[:cnt]); err != nil {
-		fmt.Println("write back buf err", err)
-		return err
-	}
-	return nil
 }
 
 // Start 启动服务器
@@ -66,7 +64,7 @@ func (s *Server) Start() {
 			continue
 		}
 		// 已经与客户端建立链接
-		dealConn := NewConnection(conn, cid, CallBackToClient)
+		dealConn := NewConnection(conn, cid, s.Router)
 		cid++
 
 		// 启动当前链接的处理业务
