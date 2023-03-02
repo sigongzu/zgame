@@ -29,6 +29,17 @@ func NewServer(name string) ziface.IServer {
 	return s
 }
 
+// 定义当前客户端的连接的所绑定的handle api，也就是当前连接所要处理的业务，（目前写死）
+func CallBackToClient(conn *net.TCPConn, data []byte, cnt int) error {
+	// 回显业务
+	fmt.Println("[Conn Handle] CallbackToClient...")
+	if _, err := conn.Write(data[:cnt]); err != nil {
+		fmt.Println("write back buf err", err)
+		return err
+	}
+	return nil
+}
+
 // Start 启动服务器
 func (s *Server) Start() {
 	// 1 获取一个TCP的Addr
@@ -44,36 +55,24 @@ func (s *Server) Start() {
 		return
 	}
 	fmt.Println("start Zinx server succ, ", s.Name, " succ, now listening...")
-	// 3 创建一个goroutine去做server.ServerAccept()业务
-	go func() {
-		// 3.1 阻塞的等待客户端连接，处理客户端连接业务(读写)
-		for {
-			// 如果有客户端连接过来，阻塞会返回
-			conn, err := listener.AcceptTCP()
-			if err != nil {
-				fmt.Println("Accept err", err)
-				continue
-			}
-			// 已经与客户端建立连接，做一些业务，做一个最基本的最大512字节的回显业务
-			go func() {
-				// 不断的循环，等待客户端通过conn发送信息
-				for {
-					buf := make([]byte, 512)
-					cnt, err := conn.Read(buf)
-					if err != nil {
-						fmt.Println("recv buf err", err)
-						continue
-					}
-					fmt.Printf("recv client buf %s, cnt = %d\n", buf, cnt)
-					// 回显功能
-					if _, err := conn.Write(buf[:cnt]); err != nil {
-						fmt.Println("write back buf err", err)
-						continue
-					}
-				}
-			}()
+
+	var cid uint32 = 0
+	// 3 阻塞的等待客户端链接，处理客户端链接业务（读写）
+	for {
+		// 如果有客户端链接过来，阻塞会返回
+		conn, err := listener.AcceptTCP()
+		if err != nil {
+			fmt.Println("Accept err", err)
+			continue
 		}
-	}()
+		// 已经与客户端建立链接
+		dealConn := NewConnection(conn, cid, CallBackToClient)
+		cid++
+
+		// 启动当前链接的处理业务
+		go dealConn.Start()
+	}
+
 }
 
 // Stop 停止服务器
