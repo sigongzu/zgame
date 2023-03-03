@@ -17,11 +17,11 @@ func main() {
 	}
 
 	for {
-		// 发送封包的msg消息, 1号消息
+		// 发送封包的msg消息, 0号消息
 		dp := znet.NewDataPack()
-		binaryMsg, err := dp.Pack(znet.NewMsgPackage(1, []byte("zinx0.5 client1 test message")))
+		binaryMsg, err := dp.Pack(znet.NewMsgPackage(0, []byte("zinx0.5 client test message")))
 		if err != nil {
-			fmt.Println("Pack error msg id = ", 1)
+			fmt.Println("Pack error msg id = ", 0)
 			return
 		}
 		if _, err := conn.Write(binaryMsg); err != nil {
