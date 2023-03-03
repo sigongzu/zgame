@@ -1,17 +1,26 @@
 package znet
 
-import "zgame/zinx/ziface"
+import (
+	"zgame/zinx/utils"
+	"zgame/zinx/ziface"
+)
 
 // 消息处理模块的实现
 type MsgHandle struct {
 	// 存放每个MsgID所对应的处理方法
 	Apis map[uint32]ziface.IRouter
+	// 负责Worker取任务的消息队列
+	TaskQueue []chan ziface.IRequest
+	// 业务工作Worker池的worker数量
+	WorkerPoolSize uint32
 }
 
 // 初始化/创建MsgHandle方法
 func NewMsgHandle() *MsgHandle {
 	return &MsgHandle{
-		Apis: make(map[uint32]ziface.IRouter),
+		Apis:           make(map[uint32]ziface.IRouter),
+		WorkerPoolSize: utils.GlobalObject.WorkerPoolSize, // TODO 给一个默认值
+		TaskQueue:      make([]chan ziface.IRequest, utils.GlobalObject.MaxWorkerTaskLen),
 	}
 }
 
