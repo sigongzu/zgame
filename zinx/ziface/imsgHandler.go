@@ -6,4 +6,6 @@ type IMsgHandle interface {
 	DoMsgHandler(request IRequest)
 	// 为消息添加具体的处理逻辑
 	AddRouter(msgID uint32, router IRouter)
+	// 启动一个Worker工作池(开启工作池的动作只能发生一次，一个Zinx框架只能有一个Worker工作池)
+	StartWorkerPool()
 }
