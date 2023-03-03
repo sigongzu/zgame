@@ -66,11 +66,28 @@ func (mh *MsgHandle) StartWorkerPool() {
 func (mh *MsgHandle) startOneWorker(workerID int, taskQueue chan ziface.IRequest) {
 	println("Worker ID=", workerID, " is started...")
 	// 不断的阻塞等待对应消息队列的消息
+	// for {
+	// 	select {
+	// 	// 如果有消息过来，出列的就是一个客户端的Request，执行当前Request所绑定的业务
+	// 	case request := <-taskQueue:
+	// 		mh.DoMsgHandler(request)
+	// 	}
+	// }
 	for {
-		select {
-		// 如果有消息过来，出列的就是一个客户端的Request，执行当前Request所绑定的业务
-		case request := <-taskQueue:
-			mh.DoMsgHandler(request)
-		}
+		request := <-taskQueue
+		mh.DoMsgHandler(request)
 	}
+}
+
+// 将消息交给TaskQueue，由Worker进行处理
+func (mh *MsgHandle) SendMsgToTaskQueue(request ziface.IRequest) {
+	// 1. 将消息平均分配给不同的worker,(如果是分布式的话，可以根据客户端的IP地址来进行分配区域)
+	// 根据客户端建立的ConnID来进行分配
+	// 保证每个客户端的消息都是由同一个go来处理
+	workerID := request.GetConnection().GetConnID() % mh.WorkerPoolSize
+	println("Add ConnID=", request.GetConnection().GetConnID(),
+		" request MsgID=", request.GetMsgID(),
+		" to WorkerID=", workerID)
+	// 2. 将消息发送给对应的worker的TaskQueue即可
+	mh.TaskQueue[workerID] <- request
 }

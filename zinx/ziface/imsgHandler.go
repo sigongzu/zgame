@@ -8,4 +8,6 @@ type IMsgHandle interface {
 	AddRouter(msgID uint32, router IRouter)
 	// 启动一个Worker工作池(开启工作池的动作只能发生一次，一个Zinx框架只能有一个Worker工作池)
 	StartWorkerPool()
+	// 将消息交给TaskQueue,由worker进行处理
+	SendMsgToTaskQueue(request IRequest)
 }
