@@ -17,8 +17,11 @@ type Connection struct {
 	// 当前链接的状态
 	isClosed bool
 
-	// 告知当前链接已经退出/停止的channel
+	// 告知当前链接已经退出/停止的channel,由Reader告知Writer退出
 	ExitChan chan bool
+
+	// 无缓冲的管道，用于读、写Goroutine之间的消息通信
+	MsgChan chan []byte
 
 	// 消息的管理MsgID和对应的处理业务API关系
 	MsgHandler ziface.IMsgHandle
@@ -31,6 +34,7 @@ func NewConnection(conn *net.TCPConn, connID uint32, msgHandler ziface.IMsgHandl
 		ConnID:     connID,
 		MsgHandler: msgHandler,
 		isClosed:   false,
+		MsgChan:    make(chan []byte),
 		ExitChan:   make(chan bool, 1),
 	}
 	return c
@@ -38,8 +42,8 @@ func NewConnection(conn *net.TCPConn, connID uint32, msgHandler ziface.IMsgHandl
 
 // 连接的读业务方法
 func (c *Connection) StartReader() {
-	fmt.Println("Reader Goroutine is running...")
-	defer fmt.Println("connID = ", c.ConnID, " Reader is exit, remote addr is ", c.RemoteAddr().String())
+	fmt.Println("[Reader Goroutine is running...]")
+	defer fmt.Println("connID = ", c.ConnID, " [Reader is exit], remote addr is ", c.RemoteAddr().String())
 	defer c.Stop()
 	for {
 		// 读取客户端的数据到buf中
@@ -92,13 +96,34 @@ func (c *Connection) StartReader() {
 	}
 }
 
+// 写消息Goroutine，专门发送给客户端消息的模块
+func (c *Connection) StartWriter() {
+	fmt.Println("[Writer Goroutine is running]")
+	defer fmt.Println(c.RemoteAddr().String(), "[conn Writer exit!]")
+	// 不断的阻塞等待channel的消息，进行写给客户端
+	for {
+		select {
+		// 如果channel有数据，就发送给客户端
+		case data := <-c.MsgChan:
+			if _, err := c.Conn.Write(data); err != nil {
+				fmt.Println("Send data error", err)
+				return
+			}
+		// 如果channel被关闭，就退出
+		case <-c.ExitChan:
+			// 代表Reader已经退出，此时Writer也要退出
+			return
+		}
+	}
+}
+
 // 启动连接，让当前的连接开始工作
 func (c *Connection) Start() {
 	fmt.Println("Conn Start()... ConnID = ", c.ConnID)
 	// 启动从当前链接的读数据业务
 	go c.StartReader()
 	// 启动从当前链接写数据业务
-	// go c.StartWriter()
+	go c.StartWriter()
 }
 
 // 停止连接，结束当前连接状态M
@@ -115,6 +140,7 @@ func (c *Connection) Stop() {
 	c.ExitChan <- true
 	// 关闭该链接全部管道
 	close(c.ExitChan)
+	close(c.MsgChan)
 }
 
 // 获取当前连接绑定的socket conn
@@ -146,7 +172,7 @@ func (c *Connection) SendMsg(msgId uint32, data []byte) error {
 		return errors.New("Pack error msg")
 	}
 
-	// 将数据发送给客户端
-	c.Conn.Write(binaryMsg)
+	// 将数据发送给客户端,将数据发送给Writer的channel中,由Writer进行写给客户端
+	c.MsgChan <- binaryMsg
 	return nil
 }
