@@ -1,9 +1,10 @@
 package znet
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"net"
-	"zgame/zinx/utils"
 	"zgame/zinx/ziface"
 )
 
@@ -42,17 +43,46 @@ func (c *Connection) StartReader() {
 	defer c.Stop()
 	for {
 		// 读取客户端的数据到buf中
-		buf := make([]byte, utils.GlobalObject.MaxPackageSize)
-		_, err := c.Conn.Read(buf) // 从conn中读取数据
+		// buf := make([]byte, utils.GlobalObject.MaxPackageSize)
+		// _, err := c.Conn.Read(buf) // 从conn中读取数据
+		// if err != nil {
+		// 	fmt.Println("recv buf err", err)
+		// 	continue
+		// }
+
+		// 创建拆包解包对象
+		dp := NewDataPack()
+		// 读取客户端的Msg Head 二进制流 8个字节
+		headData := make([]byte, dp.GetHeadLen())
+		_, err := io.ReadFull(c.GetTCPConnection(), headData) // ReadFull 会把msg填充满为止
 		if err != nil {
-			fmt.Println("recv buf err", err)
-			continue
+			fmt.Println("read msg head error", err)
+			break
 		}
+
+		// 拆包，得到msgID和msgDataLen放在msg消息中
+		msg, err := dp.Unpack(headData)
+		if err != nil {
+			fmt.Println("unpack error", err)
+			break
+		}
+
+		// 根据dataLen再次读取Data，放在msg.Data中
+		var data []byte
+		if msg.GetDataLen() > 0 {
+			data = make([]byte, msg.GetDataLen())
+			_, err := io.ReadFull(c.GetTCPConnection(), data)
+			if err != nil {
+				fmt.Println("read msg data error", err)
+				break
+			}
+		}
+		msg.SetData(data)
 
 		// 得到当前conn数据的Request请求数据
 		req := Request{
 			conn: c,
-			data: buf,
+			msg:  msg,
 		}
 
 		// 执行注册的路由方法
@@ -106,6 +136,20 @@ func (c *Connection) RemoteAddr() net.Addr {
 }
 
 // 发送数据，将数据发送给远程的客户端
-func (c *Connection) Send(data []byte) error {
+func (c *Connection) SendMsg(msgId uint32, data []byte) error {
+	if c.isClosed {
+		return errors.New("Connection closed when send msg")
+	}
+
+	// 将data进行封包 MsgDataLen | MsgID | Data
+	dp := NewDataPack()
+	binaryMsg, err := dp.Pack(NewMsgPackage(msgId, data))
+	if err != nil {
+		fmt.Println("Pack error msg id = ", msgId)
+		return errors.New("Pack error msg")
+	}
+
+	// 将数据发送给客户端
+	c.Conn.Write(binaryMsg)
 	return nil
 }
