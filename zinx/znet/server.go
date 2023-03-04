@@ -21,17 +21,10 @@ type Server struct {
 	MsgHandler ziface.IMsgHandle
 	// 该Server的连接管理器
 	ConnMgr ziface.IConnManager
-}
-
-// AddRouter 给当前的Server注册一个路由方法，供客户端的链接处理使用
-func (s *Server) AddRouter(msgID uint32, router ziface.IRouter) {
-	s.MsgHandler.AddRouter(msgID, router)
-	fmt.Println("Add Router Succ!")
-}
-
-// GetConnMgr 得到链接管理
-func (s *Server) GetConnMgr() ziface.IConnManager {
-	return s.ConnMgr
+	// 该Server的连接创建时Hook函数
+	OnConnStart func(conn ziface.IConnection)
+	// 该Server的连接断开时的Hook函数
+	OnConnStop func(conn ziface.IConnection)
 }
 
 // NewServer 初始化Server模块的方法
@@ -45,6 +38,43 @@ func NewServer(name string) ziface.IServer {
 		ConnMgr:    NewConnManager(),
 	}
 	return s
+}
+
+// SetOnConnStart 注册OnConnStart钩子函数的方法
+func (s *Server) SetOnConnStart(hookFunc func(connection ziface.IConnection)) {
+	s.OnConnStart = hookFunc
+}
+
+// SetOnConnStop 注册OnConnStop钩子函数的方法
+func (s *Server) SetOnConnStop(hookFunc func(connection ziface.IConnection)) {
+	s.OnConnStop = hookFunc
+}
+
+// CallOnConnStart 调用OnConnStart钩子函数的方法
+func (s *Server) CallOnConnStart(conn ziface.IConnection) {
+	if s.OnConnStart != nil {
+		fmt.Println("Call OnConnStart()...")
+		s.OnConnStart(conn)
+	}
+}
+
+// CallOnConnStop 调用OnConnStop钩子函数的方法
+func (s *Server) CallOnConnStop(conn ziface.IConnection) {
+	if s.OnConnStop != nil {
+		fmt.Println("Call OnConnStop()...")
+		s.OnConnStop(conn)
+	}
+}
+
+// AddRouter 给当前的Server注册一个路由方法，供客户端的链接处理使用
+func (s *Server) AddRouter(msgID uint32, router ziface.IRouter) {
+	s.MsgHandler.AddRouter(msgID, router)
+	fmt.Println("Add Router Succ!")
+}
+
+// GetConnMgr 得到链接管理
+func (s *Server) GetConnMgr() ziface.IConnManager {
+	return s.ConnMgr
 }
 
 // Start 启动服务器
