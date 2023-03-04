@@ -46,6 +46,12 @@ func DoConnectionBegin(conn ziface.IConnection) {
 	if err := conn.SendMsg(202, []byte("DoConnection BEGIN")); err != nil {
 		fmt.Println(err)
 	}
+
+	// 设置链接属性
+	fmt.Println("Set Conn Property...")
+	conn.SetProperty("Name", "任我行")
+	conn.SetProperty("Address", "日月神教")
+
 }
 
 // 销毁连接之前执行的钩子函数
@@ -53,6 +59,16 @@ func DoConnectionLost(conn ziface.IConnection) {
 	fmt.Println("DoConnectionLost is Called ...")
 	if err := conn.SendMsg(203, []byte("DoConnection Lost")); err != nil {
 		fmt.Println(err)
+	}
+
+	// 获取链接属性
+	fmt.Println("Get Conn Property...")
+	if name, err := conn.GetProperty("Name"); err == nil {
+		fmt.Println("Name = ", name)
+	}
+
+	if address, err := conn.GetProperty("Address"); err == nil {
+		fmt.Println("Address = ", address)
 	}
 }
 
